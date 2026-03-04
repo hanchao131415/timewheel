@@ -1,0 +1,122 @@
+# TimeWheel 企业级调度系统配置
+
+server:
+  port: 8080
+  mode: release  # debug / release / test
+  read_timeout: 30s
+  write_timeout: 30s
+  shutdown_timeout: 10s
+
+# 运行模式: standalone(单机) / cluster(集群)
+mode: standalone
+
+# 时间轮配置
+timewheel:
+  levels:
+    high:
+      interval: 100ms    # 高精度：火警等敏感任务
+      slots: 60
+    normal:
+      interval: 1s       # 中精度：温湿度等实时数据
+      slots: 60
+    low:
+      interval: 10s      # 低精度：常规任务
+      slots: 60
+  max_concurrent_tasks: 1000
+  cache_enabled: true
+  cache_size: 100000
+
+# 数据库配置
+database:
+  type: mysql  # mysql / sqlite
+  # MySQL 配置
+  mysql:
+    host: 127.0.0.1
+    port: 3306
+    username: root
+    password: ""
+    database: timewheel
+    charset: utf8mb4
+    max_open_conns: 100
+    max_idle_conns: 10
+    conn_max_lifetime: 1h
+  # SQLite 配置 (当 type=sqlite 时使用)
+  sqlite:
+    path: ./data/timewheel.db
+
+# Redis 配置 (集群模式必须)
+redis:
+  enabled: false
+  addr: 127.0.0.1:6379
+  password: ""
+  db: 0
+  pool_size: 100
+  min_idle_conns: 10
+
+# 告警配置
+alert:
+  webhook:
+    url: https://hooks.example.com/alert
+    timeout: 10s
+    retry:
+      max_attempts: 3
+      initial_interval: 1s
+      max_interval: 30s
+      multiplier: 2.0
+    batch:
+      enabled: true
+      size: 100
+      interval: 5s
+    headers:
+      Content-Type: application/json
+
+# 日志配置
+logging:
+  level: info  # debug / info / warn / error
+  format: json  # json / console
+  output:
+    type: file  # stdout / file / both
+    path: ./logs/timewheel.log
+  rotation:
+    max_size: 100      # MB
+    max_age: 30        # days
+    max_backups: 10
+    compress: true
+
+# 认证配置
+auth:
+  enabled: false
+  type: jwt  # jwt / api_key
+  # JWT 配置
+  jwt:
+    secret: your-secret-key-change-in-production
+    issuer: timewheel
+    expiry: 24h
+  # API Key 配置
+  api_key:
+    header: X-API-Key
+    keys:
+      - name: default
+        key: your-api-key-change-in-production
+
+# 限流配置
+rate_limit:
+  enabled: true
+  type: token_bucket  # token_bucket / sliding_window
+  requests_per_second: 1000
+  burst: 2000
+  by_ip: true
+  by_api_key: true
+
+# Prometheus 指标配置
+metrics:
+  enabled: true
+  path: /metrics
+  namespace: timewheel
+  subsystem: scheduler
+
+# 健康检查配置
+health:
+  enabled: true
+  live_path: /health/live
+  ready_path: /health/ready
