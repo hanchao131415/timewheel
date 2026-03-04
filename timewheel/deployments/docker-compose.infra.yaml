@@ -1,0 +1,129 @@
+# TimeWheel 基础设施 Docker Compose
+# 包含 MySQL、Redis 和 RabbitMQ 服务
+#
+# 启动: docker-compose -f docker-compose.infra.yaml up -d
+# 停止: docker-compose -f docker-compose.infra.yaml down
+# 查看日志: docker-compose -f docker-compose.infra.yaml logs -f
+# 启用延迟队列插件: docker exec timewheel-rabbitmq rabbitmq-plugins enable rabbitmq_delayed_message_exchange
+
+version: '3.8'
+
+services:
+  # MySQL 数据库
+  mysql:
+    image: mysql:8.0
+    container_name: timewheel-mysql
+    restart: unless-stopped
+    ports:
+      - "3306:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: timewheel123
+      MYSQL_DATABASE: timewheel
+      MYSQL_USER: timewheel
+      MYSQL_PASSWORD: timewheel123
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ../migrations:/docker-entrypoint-initdb.d:ro
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+      - --default-authentication-plugin=mysql_native_password
+      - --max_connections=1000
+      - --innodb_buffer_pool_size=256M
+      - --innodb_log_file_size=64M
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p$$MYSQL_ROOT_PASSWORD"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - timewheel-net
+
+  # Redis 缓存
+  redis:
+    image: redis:7-alpine
+    container_name: timewheel-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command:
+      - redis-server
+      - --requirepass timewheel123
+      - --appendonly yes
+      - --maxmemory 256mb
+      - --maxmemory-policy allkeys-lru
+      - --save 60 1000
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "timewheel123", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - timewheel-net
+
+  # RabbitMQ 消息队列 (支持延迟队列)
+  rabbitmq:
+    image: rabbitmq:3.13-management
+    container_name: timewheel-rabbitmq
+    restart: unless-stopped
+    ports:
+      - "5672:5672"    # AMQP 协议端口
+      - "15672:15672"  # 管理界面端口
+    environment:
+      RABBITMQ_DEFAULT_USER: timewheel
+      RABBITMQ_DEFAULT_PASS: timewheel123
+      RABBITMQ_DEFAULT_VHOST: /timewheel
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmqctl", "status"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 40s
+    networks:
+      - timewheel-net
+
+  # Redis Commander (可选 - Redis Web 管理界面)
+  redis-commander:
+    image: rediscommander/redis-commander:latest
+    container_name: timewheel-redis-commander
+    restart: unless-stopped
+    ports:
+      - "8081:8081"
+    environment:
+      - REDIS_HOSTS=local:redis:6379:0:timewheel123
+    depends_on:
+      - redis
+    profiles:
+      - tools
+    networks:
+      - timewheel-net
+
+  # Adminer (可选 - 数据库 Web 管理界面)
+  adminer:
+    image: adminer:latest
+    container_name: timewheel-adminer
+    restart: unless-stopped
+    ports:
+      - "8082:8080"
+    depends_on:
+      - mysql
+    profiles:
+      - tools
+    networks:
+      - timewheel-net
+
+volumes:
+  mysql_data:
+    driver: local
+  redis_data:
+    driver: local
+  rabbitmq_data:
+    driver: local
+
+networks:
+  timewheel-net:
+    driver: bridge
