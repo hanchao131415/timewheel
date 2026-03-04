@@ -8,7 +8,7 @@ import (
 
 // TaskCreateRequest 创建任务请求
 type TaskCreateRequest struct {
-	ID               string            `json:"id" binding:"required,max=64"`
+	ID               string            `json:"id" binding:"omitempty,max=64"` // 可选，不传则自动生成雪花ID
 	Name             string            `json:"name" binding:"required,max=255"`
 	Description      string            `json:"description" binding:"max=500"`
 	Mode             int               `json:"mode" binding:"gte=0,lte=2"` // 0:重复,1:单次,2:固定次数

@@ -14,6 +14,7 @@ import (
 	"timewheel/internal/model/dto"
 	"timewheel/internal/repository"
 	"timewheel/internal/repository/model"
+	"timewheel/pkg/snowflake"
 	timewheelCore "timewheel/pkg/timewheel"
 )
 
@@ -140,6 +141,13 @@ func (s *atomicTaskService) executeAtomically(
 
 // Create 创建任务（原子操作）
 func (s *atomicTaskService) Create(ctx context.Context, req *dto.TaskCreateRequest) (*dto.TaskResponse, error) {
+	// 如果未提供ID，使用雪花算法自动生成
+	if req.ID == "" {
+		req.ID = snowflake.GenerateString()
+		s.logger.Debug("Auto-generated task ID",
+			zap.String("task_id", req.ID))
+	}
+
 	// 检查任务 ID 是否已存在
 	existing, err := s.repo.GetByID(ctx, req.ID)
 	if err == nil && existing != nil {
