@@ -19,8 +19,10 @@ type TaskRepository interface {
 	List(ctx context.Context, query *TaskQuery) ([]*model.TaskModel, int64, error)
 	// 更新任务
 	Update(ctx context.Context, task *model.TaskModel) error
-	// 删除任务
+	// 删除任务（软删除）
 	Delete(ctx context.Context, id string) error
+	// 恢复软删除的任务（用于回滚）
+	Undelete(ctx context.Context, task *model.TaskModel) error
 	// 获取所有启用的任务
 	GetEnabled(ctx context.Context) ([]*model.TaskModel, error)
 	// 更新任务状态
@@ -119,6 +121,15 @@ func (r *taskRepository) Update(ctx context.Context, task *model.TaskModel) erro
 // Delete 删除任务
 func (r *taskRepository) Delete(ctx context.Context, id string) error {
 	return r.db.WithContext(ctx).Delete(&model.TaskModel{}, "id = ?", id).Error
+}
+
+// Undelete 恢复软删除的任务（用于回滚）
+func (r *taskRepository) Undelete(ctx context.Context, task *model.TaskModel) error {
+	// 清除 DeletedAt 字段以恢复记录
+	task.DeletedAt = gorm.DeletedAt{}
+	return r.db.WithContext(ctx).Unscoped().Model(&model.TaskModel{}).
+		Where("id = ?", task.ID).
+		Update("deleted_at", nil).Error
 }
 
 // GetEnabled 获取所有启用的任务

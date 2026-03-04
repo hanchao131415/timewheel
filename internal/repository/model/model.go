@@ -176,3 +176,40 @@ const (
 	WebhookStatusSuccess = "success"
 	WebhookStatusFailed  = "failed"
 )
+
+// OperationLogModel 操作日志数据库模型（用于原子性保证和恢复）
+type OperationLogModel struct {
+	ID           uint            `gorm:"primaryKey;autoIncrement;comment:主键ID"`
+	TaskID       string          `gorm:"type:varchar(64);not null;index;comment:任务ID"`
+	Operation    string          `gorm:"type:varchar(20);not null;comment:操作类型(create/delete/enable/disable/pause/resume/update)"`
+	Status       string          `gorm:"type:varchar(20);not null;index;comment:状态(pending/completed/failed/rollback_failed)"`
+	OldState     json.RawMessage `gorm:"type:json;comment:操作前状态快照"`
+	NewState     json.RawMessage `gorm:"type:json;comment:操作后状态快照"`
+	ErrorMessage string          `gorm:"type:text;comment:错误信息"`
+	CreatedAt    time.Time       `gorm:"type:datetime;autoCreateTime;comment:创建时间"`
+	CompletedAt  *time.Time      `gorm:"type:datetime;comment:完成时间"`
+}
+
+// TableName 指定表名
+func (OperationLogModel) TableName() string {
+	return "operation_logs"
+}
+
+// 操作类型常量
+const (
+	OpCreate  = "create"
+	OpDelete  = "delete"
+	OpEnable  = "enable"
+	OpDisable = "disable"
+	OpPause   = "pause"
+	OpResume  = "resume"
+	OpUpdate  = "update"
+)
+
+// 操作状态常量
+const (
+	OpStatusPending        = "pending"
+	OpStatusCompleted      = "completed"
+	OpStatusFailed         = "failed"
+	OpStatusRollbackFailed = "rollback_failed"
+)
